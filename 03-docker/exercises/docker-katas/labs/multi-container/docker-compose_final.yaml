@@ -1,0 +1,18 @@
+services:
+  wordpress-container:
+    image: wordpress:5.7.2-apache
+    ports:
+      - 8080:80
+    environment:
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_HOST: mysql-container
+      WORDPRESS_DB_NAME: wordpressdb
+    depends_on:
+      - mysql-container
+
+  mysql-container:
+    image: mysql:5.7.36
+    environment:
+      MYSQL_ROOT_PASSWORD: wordpress
+      MYSQL_DATABASE: wordpressdb

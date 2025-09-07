@@ -1,0 +1,9 @@
+services:
+  app:
+    image: basic-compose:latest
+    ports:
+      - "8050:5000"
+    volumes:
+      - ".:/usr/src/app/"
+    command: "/usr/src/app/app.py"
+
