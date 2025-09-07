@@ -1,19 +1,19 @@
-# Exercise 7: Docker Orchestration and Microservices Architecture
+# Exercise 7: Docker Compose Microservices Architecture
 **Duration: 240 minutes (4 hours)**  
 **Difficulty: Advanced**  
 **Prerequisites: Exercises 1-6**
 
 ## Learning Objectives
 By completing this exercise, you will:
-- Design and implement a complete microservices architecture with Docker
-- Master Docker Swarm orchestration for production deployments
-- Implement service mesh patterns for inter-service communication
-- Configure advanced load balancing and service discovery
+- Design and implement a complete microservices architecture with Docker Compose
+- Master advanced Docker Compose patterns for production-like deployments
+- Implement service discovery and inter-service communication
+- Configure advanced networking, load balancing, and health checks
 - Implement comprehensive logging, monitoring, and observability
 - Handle database migrations and data consistency in distributed systems
 
 ## Scenario
-You're architecting a complete e-commerce microservices platform with Docker orchestration. The system needs to handle high traffic, ensure data consistency, and provide comprehensive observability across all services.
+You're architecting a complete e-commerce microservices platform using Docker Compose. The system needs to handle multiple services, ensure data consistency, and provide comprehensive observability across all components.
 
 ## Part 1: Microservices Architecture Design (60 minutes)
 
@@ -424,66 +424,82 @@ Create the foundation for all microservices with shared patterns.
    EOF
    ```
 
-## Part 2: Docker Swarm Orchestration (60 minutes)
+## Part 2: Docker Compose Advanced Configuration (60 minutes)
 
-### Task 2.1: Initialize Docker Swarm and Service Discovery
-Set up Docker Swarm with proper networking and service discovery.
+### Task 2.1: Advanced Docker Compose Setup
+Set up advanced Docker Compose configuration with proper networking and service discovery.
 
 **Instructions:**
-1. **Create Docker Swarm initialization script**
+1. **Create environment configuration**
    ```bash
-   mkdir -p infrastructure/swarm
+   mkdir -p infrastructure/compose
    
-   cat > infrastructure/swarm/init-swarm.sh << 'EOF'
+   cat > infrastructure/compose/setup.sh << 'EOF'
    #!/bin/bash
    set -euo pipefail
 
-   echo "🚀 Initializing Docker Swarm cluster..."
+   echo "🚀 Setting up Docker Compose environment..."
 
-   # Initialize swarm
-   docker swarm init --advertise-addr $(hostname -i) || echo "Swarm already initialized"
+   # Create custom networks
+   echo "📡 Creating custom networks..."
+   docker network create frontend-network --driver bridge || echo "frontend-network already exists"
+   docker network create backend-network --driver bridge || echo "backend-network already exists"
+   docker network create database-network --driver bridge || echo "database-network already exists"
+   docker network create monitoring-network --driver bridge || echo "monitoring-network already exists"
 
-   # Create overlay networks
-   echo "📡 Creating overlay networks..."
-   docker network create --driver overlay --attachable frontend-network || echo "frontend-network already exists"
-   docker network create --driver overlay --attachable backend-network || echo "backend-network already exists"
-   docker network create --driver overlay --attachable database-network || echo "database-network already exists"
-   docker network create --driver overlay --attachable monitoring-network || echo "monitoring-network already exists"
+   # Create environment files for secrets
+   echo "🔐 Creating environment files..."
+   mkdir -p secrets
+   echo "POSTGRES_PASSWORD=postgres_password_123" > secrets/.env.postgres
+   echo "JWT_SECRET=jwt_secret_key_456" > secrets/.env.jwt
+   echo "REDIS_PASSWORD=redis_password_789" > secrets/.env.redis
 
-   # Create secrets for database passwords
-   echo "🔐 Creating secrets..."
-   echo "postgres_password_123" | docker secret create postgres_password - || echo "postgres_password already exists"
-   echo "jwt_secret_key_456" | docker secret create jwt_secret - || echo "jwt_secret already exists"
-   echo "redis_password_789" | docker secret create redis_password - || echo "redis_password already exists"
-
-   # Create configs for shared configuration
-   echo "⚙️ Creating configs..."
-   cat > /tmp/nginx-proxy.conf << 'NGINX_EOF'
+   # Create nginx configuration for API Gateway
+   echo "⚙️ Creating nginx configuration..."
+   mkdir -p configs/nginx
+   cat > configs/nginx/nginx.conf << 'NGINX_EOF'
    upstream user_service {
-       server user-service:3001;
+       server user-service:3001 max_fails=3 fail_timeout=30s;
    }
    
    upstream product_service {
-       server product-service:3002;
+       server product-service:3002 max_fails=3 fail_timeout=30s;
    }
    
    upstream order_service {
-       server order-service:3003;
+       server order-service:3003 max_fails=3 fail_timeout=30s;
    }
    
    upstream payment_service {
-       server payment-service:3004;
+       server payment-service:3004 max_fails=3 fail_timeout=30s;
    }
+
+   # Rate limiting
+   limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
 
    server {
        listen 80;
        server_name api.localhost;
+       
+       # Rate limiting
+       limit_req zone=api burst=20 nodelay;
+       
+       # Health check endpoint
+       location /health {
+           access_log off;
+           return 200 "healthy\n";
+           add_header Content-Type text/plain;
+       }
        
        location /api/users {
            proxy_pass http://user_service;
            proxy_set_header Host $host;
            proxy_set_header X-Real-IP $remote_addr;
            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+           proxy_connect_timeout 30s;
+           proxy_send_timeout 30s;
+           proxy_read_timeout 30s;
        }
        
        location /api/products {
@@ -491,6 +507,7 @@ Set up Docker Swarm with proper networking and service discovery.
            proxy_set_header Host $host;
            proxy_set_header X-Real-IP $remote_addr;
            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
        }
        
        location /api/orders {
@@ -498,6 +515,7 @@ Set up Docker Swarm with proper networking and service discovery.
            proxy_set_header Host $host;
            proxy_set_header X-Real-IP $remote_addr;
            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
        }
        
        location /api/payments {
@@ -505,53 +523,50 @@ Set up Docker Swarm with proper networking and service discovery.
            proxy_set_header Host $host;
            proxy_set_header X-Real-IP $remote_addr;
            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
        }
    }
    NGINX_EOF
 
-   docker config create nginx_proxy_config /tmp/nginx-proxy.conf || echo "nginx_proxy_config already exists"
-   rm /tmp/nginx-proxy.conf
-
-   echo "✅ Docker Swarm initialization completed"
+   echo "✅ Docker Compose environment setup completed"
    EOF
    
-   chmod +x infrastructure/swarm/init-swarm.sh
+   chmod +x infrastructure/compose/setup.sh
    ```
 
-2. **Create comprehensive Docker Stack file**
+2. **Create comprehensive Docker Compose file**
    ```yaml
-   # docker-stack.yml
+   # docker-compose.yml
    version: '3.8'
 
    services:
      # API Gateway
      api-gateway:
        image: nginx:alpine
-       configs:
-         - source: nginx_proxy_config
-           target: /etc/nginx/conf.d/default.conf
+       volumes:
+         - ./configs/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
        ports:
          - "80:80"
          - "443:443"
        networks:
          - frontend-network
          - backend-network
-       deploy:
-         replicas: 2
-         placement:
-           constraints:
-             - node.role == manager
-         resources:
-           limits:
-             memory: 128M
-           reservations:
-             memory: 64M
-         restart_policy:
-           condition: on-failure
-           delay: 5s
-           max_attempts: 3
+       restart: unless-stopped
+       mem_limit: 128m
+       mem_reservation: 64m
+       healthcheck:
+         test: ["CMD", "curl", "-f", "http://localhost/health"]
+         interval: 30s
+         timeout: 10s
+         retries: 3
+         start_period: 10s
+       depends_on:
+         - user-service
+         - product-service
+         - order-service
+         - payment-service
 
-     # User Service
+     # User Service (scaled with docker-compose up --scale user-service=3)
      user-service:
        image: microservices-platform/user-service:latest
        environment:
@@ -560,37 +575,28 @@ Set up Docker Swarm with proper networking and service discovery.
          - DB_HOST=user-db
          - DB_NAME=users
          - DB_USER=postgres
-         - JWT_SECRET_FILE=/run/secrets/jwt_secret
-         - DB_PASSWORD_FILE=/run/secrets/postgres_password
-       secrets:
-         - postgres_password
-         - jwt_secret
+         - JWT_SECRET=jwt_secret_key_456
+         - POSTGRES_PASSWORD=postgres_password_123
+       env_file:
+         - ./secrets/.env.postgres
+         - ./secrets/.env.jwt
        networks:
          - backend-network
          - database-network
-       deploy:
-         replicas: 3
-         resources:
-           limits:
-             memory: 512M
-           reservations:
-             memory: 256M
-         restart_policy:
-           condition: on-failure
-         update_config:
-           parallelism: 1
-           delay: 10s
-           order: start-first
-         placement:
-           max_replicas_per_node: 1
+       restart: unless-stopped
+       mem_limit: 512m
+       mem_reservation: 256m
        healthcheck:
          test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
          interval: 30s
          timeout: 10s
          retries: 3
          start_period: 40s
+       depends_on:
+         user-db:
+           condition: service_healthy
 
-     # Product Service  
+     # Product Service (scaled with docker-compose up --scale product-service=4)
      product-service:
        image: microservices-platform/product-service:latest
        environment:
@@ -600,28 +606,28 @@ Set up Docker Swarm with proper networking and service discovery.
          - DB_NAME=products
          - DB_USER=postgres
          - REDIS_HOST=redis-cache
-         - DB_PASSWORD_FILE=/run/secrets/postgres_password
-         - REDIS_PASSWORD_FILE=/run/secrets/redis_password
-       secrets:
-         - postgres_password
-         - redis_password
+       env_file:
+         - ./secrets/.env.postgres
+         - ./secrets/.env.redis
        networks:
          - backend-network
          - database-network
-       deploy:
-         replicas: 4
-         resources:
-           limits:
-             memory: 512M
-           reservations:
-             memory: 256M
-         restart_policy:
-           condition: on-failure
-         update_config:
-           parallelism: 2
-           delay: 10s
+       restart: unless-stopped
+       mem_limit: 512m
+       mem_reservation: 256m
+       healthcheck:
+         test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+         interval: 30s
+         timeout: 10s
+         retries: 3
+         start_period: 40s
+       depends_on:
+         product-db:
+           condition: service_healthy
+         redis-cache:
+           condition: service_healthy
 
-     # Order Service
+     # Order Service (scaled with docker-compose up --scale order-service=3)
      order-service:
        image: microservices-platform/order-service:latest
        environment:
@@ -633,21 +639,29 @@ Set up Docker Swarm with proper networking and service discovery.
          - USER_SERVICE_URL=http://user-service:3001
          - PRODUCT_SERVICE_URL=http://product-service:3002
          - PAYMENT_SERVICE_URL=http://payment-service:3004
-         - DB_PASSWORD_FILE=/run/secrets/postgres_password
-       secrets:
-         - postgres_password
+       env_file:
+         - ./secrets/.env.postgres
        networks:
          - backend-network
          - database-network
-       deploy:
-         replicas: 3
-         resources:
-           limits:
-             memory: 512M
-           reservations:
-             memory: 256M
+       restart: unless-stopped
+       mem_limit: 512m
+       mem_reservation: 256m
+       healthcheck:
+         test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+         interval: 30s
+         timeout: 10s
+         retries: 3
+         start_period: 40s
+       depends_on:
+         order-db:
+           condition: service_healthy
+         user-service:
+           condition: service_healthy
+         product-service:
+           condition: service_healthy
 
-     # Payment Service
+     # Payment Service (scaled with docker-compose up --scale payment-service=2)
      payment-service:
        image: microservices-platform/payment-service:latest
        environment:
@@ -656,19 +670,23 @@ Set up Docker Swarm with proper networking and service discovery.
          - DB_HOST=payment-db
          - DB_NAME=payments
          - DB_USER=postgres
-         - DB_PASSWORD_FILE=/run/secrets/postgres_password
-       secrets:
-         - postgres_password
+       env_file:
+         - ./secrets/.env.postgres
        networks:
          - backend-network
          - database-network
-       deploy:
-         replicas: 2
-         resources:
-           limits:
-             memory: 512M
-           reservations:
-             memory: 256M
+       restart: unless-stopped
+       mem_limit: 512m
+       mem_reservation: 256m
+       healthcheck:
+         test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+         interval: 30s
+         timeout: 10s
+         retries: 3
+         start_period: 40s
+       depends_on:
+         payment-db:
+           condition: service_healthy
 
      # Databases
      user-db:
@@ -676,93 +694,110 @@ Set up Docker Swarm with proper networking and service discovery.
        environment:
          - POSTGRES_DB=users
          - POSTGRES_USER=postgres
-         - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
-       secrets:
-         - postgres_password
+         - POSTGRES_PASSWORD=postgres_password_123
+       env_file:
+         - ./secrets/.env.postgres
        volumes:
          - user-db-data:/var/lib/postgresql/data
+         - ./configs/postgres/init-user-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
        networks:
          - database-network
-       deploy:
-         replicas: 1
-         placement:
-           constraints:
-             - node.labels.database == true
-         resources:
-           limits:
-             memory: 512M
-           reservations:
-             memory: 256M
+       restart: unless-stopped
+       mem_limit: 512m
+       mem_reservation: 256m
+       healthcheck:
+         test: ["CMD-SHELL", "pg_isready -U postgres -d users"]
+         interval: 10s
+         timeout: 5s
+         retries: 5
+         start_period: 30s
 
      product-db:
        image: postgres:15-alpine
        environment:
          - POSTGRES_DB=products
          - POSTGRES_USER=postgres
-         - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
-       secrets:
-         - postgres_password
+         - POSTGRES_PASSWORD=postgres_password_123
+       env_file:
+         - ./secrets/.env.postgres
        volumes:
          - product-db-data:/var/lib/postgresql/data
+         - ./configs/postgres/init-product-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
        networks:
          - database-network
-       deploy:
-         replicas: 1
-         placement:
-           constraints:
-             - node.labels.database == true
+       restart: unless-stopped
+       mem_limit: 512m
+       mem_reservation: 256m
+       healthcheck:
+         test: ["CMD-SHELL", "pg_isready -U postgres -d products"]
+         interval: 10s
+         timeout: 5s
+         retries: 5
+         start_period: 30s
 
      order-db:
        image: postgres:15-alpine
        environment:
          - POSTGRES_DB=orders
          - POSTGRES_USER=postgres
-         - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
-       secrets:
-         - postgres_password
+         - POSTGRES_PASSWORD=postgres_password_123
+       env_file:
+         - ./secrets/.env.postgres
        volumes:
          - order-db-data:/var/lib/postgresql/data
+         - ./configs/postgres/init-order-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
        networks:
          - database-network
-       deploy:
-         replicas: 1
-         placement:
-           constraints:
-             - node.labels.database == true
+       restart: unless-stopped
+       mem_limit: 512m
+       mem_reservation: 256m
+       healthcheck:
+         test: ["CMD-SHELL", "pg_isready -U postgres -d orders"]
+         interval: 10s
+         timeout: 5s
+         retries: 5
+         start_period: 30s
 
      payment-db:
        image: postgres:15-alpine
        environment:
          - POSTGRES_DB=payments
          - POSTGRES_USER=postgres
-         - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
-       secrets:
-         - postgres_password
+         - POSTGRES_PASSWORD=postgres_password_123
+       env_file:
+         - ./secrets/.env.postgres
        volumes:
          - payment-db-data:/var/lib/postgresql/data
+         - ./configs/postgres/init-payment-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
        networks:
          - database-network
-       deploy:
-         replicas: 1
-         placement:
-           constraints:
-             - node.labels.database == true
+       restart: unless-stopped
+       mem_limit: 512m
+       mem_reservation: 256m
+       healthcheck:
+         test: ["CMD-SHELL", "pg_isready -U postgres -d payments"]
+         interval: 10s
+         timeout: 5s
+         retries: 5
+         start_period: 30s
 
      # Cache
      redis-cache:
        image: redis:7-alpine
-       command: redis-server --requirepass-file /run/secrets/redis_password
-       secrets:
-         - redis_password
+       command: redis-server --requirepass redis_password_789
+       env_file:
+         - ./secrets/.env.redis
        networks:
          - backend-network
-       deploy:
-         replicas: 1
-         resources:
-           limits:
-             memory: 256M
-           reservations:
-             memory: 128M
+       restart: unless-stopped
+       mem_limit: 256m
+       mem_reservation: 128m
+       healthcheck:
+         test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+         interval: 10s
+         timeout: 3s
+         retries: 5
+         start_period: 20s
 
      # Monitoring
      prometheus:
@@ -772,79 +807,102 @@ Set up Docker Swarm with proper networking and service discovery.
          - '--storage.tsdb.path=/prometheus'
          - '--web.console.libraries=/etc/prometheus/console_libraries'
          - '--web.console.templates=/etc/prometheus/consoles'
+         - '--web.enable-lifecycle'
+       volumes:
+         - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+         - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+         - prometheus-data:/prometheus
        ports:
          - "9090:9090"
        networks:
          - monitoring-network
          - backend-network
-       deploy:
-         replicas: 1
-         placement:
-           constraints:
-             - node.role == manager
+       restart: unless-stopped
+       healthcheck:
+         test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+         interval: 30s
+         timeout: 10s
+         retries: 3
+         start_period: 30s
 
      grafana:
        image: grafana/grafana:latest
        environment:
          - GF_SECURITY_ADMIN_PASSWORD=admin123
+         - GF_USERS_ALLOW_SIGN_UP=false
+       volumes:
+         - grafana-data:/var/lib/grafana
+         - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
        ports:
          - "3000:3000"
        networks:
          - monitoring-network
-       deploy:
-         replicas: 1
-         placement:
-           constraints:
-             - node.role == manager
+       restart: unless-stopped
+       healthcheck:
+         test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+         interval: 30s
+         timeout: 10s
+         retries: 3
+         start_period: 30s
+       depends_on:
+         - prometheus
 
    volumes:
      user-db-data:
+       driver: local
      product-db-data:
+       driver: local
      order-db-data:
+       driver: local
      payment-db-data:
+       driver: local
+     prometheus-data:
+       driver: local
+     grafana-data:
+       driver: local
 
    networks:
      frontend-network:
+       driver: bridge
        external: true
      backend-network:
+       driver: bridge
        external: true
      database-network:
+       driver: bridge
        external: true
      monitoring-network:
-       external: true
-
-   secrets:
-     postgres_password:
-       external: true
-     jwt_secret:
-       external: true
-     redis_password:
-       external: true
-
-   configs:
-     nginx_proxy_config:
+       driver: bridge
        external: true
    ```
 
-### Task 2.2: Service Deployment and Scaling
-Deploy services with proper scaling and resource management.
+### Task 2.2: Docker Compose Deployment and Scaling
+Deploy services using Docker Compose with proper scaling and resource management.
 
 **Instructions:**
 1. **Create deployment script**
    ```bash
-   cat > infrastructure/swarm/deploy.sh << 'EOF'
+   cat > infrastructure/compose/deploy.sh << 'EOF'
    #!/bin/bash
    set -euo pipefail
 
-   echo "🚀 Deploying microservices to Docker Swarm..."
+   echo "🚀 Deploying microservices with Docker Compose..."
 
-   # Label nodes for database placement
-   echo "🏷️ Labeling nodes for database placement..."
-   docker node update --label-add database=true $(docker node ls -q --filter role=manager | head -1)
+   # Setup environment
+   echo "⚙️ Setting up environment..."
+   ./infrastructure/compose/setup.sh
 
-   # Deploy the stack
-   echo "📦 Deploying stack..."
-   docker stack deploy -c docker-stack.yml microservices
+   # Build services (if needed)
+   echo "🔧 Building services..."
+   docker-compose build
+
+   # Deploy the services
+   echo "📦 Starting services..."
+   docker-compose up -d
+
+   # Scale services for high availability
+   echo "📈 Scaling services..."
+   docker-compose up -d --scale user-service=3 --scale product-service=4 --scale order-service=3 --scale payment-service=2
 
    # Wait for services to be ready
    echo "⏳ Waiting for services to be ready..."
@@ -852,12 +910,12 @@ Deploy services with proper scaling and resource management.
 
    # Check service status
    echo "📊 Service status:"
-   docker service ls
+   docker-compose ps
 
    echo "🔍 Checking service health..."
-   for service in $(docker service ls --format "{{.Name}}" --filter name=microservices_); do
+   docker-compose ps --services | while read service; do
      echo "Checking $service..."
-     docker service ps $service --no-trunc
+     docker-compose ps $service
    done
 
    echo "✅ Deployment completed!"
@@ -866,12 +924,12 @@ Deploy services with proper scaling and resource management.
    echo "📈 Grafana available at: http://localhost:3000 (admin/admin123)"
    EOF
    
-   chmod +x infrastructure/swarm/deploy.sh
+   chmod +x infrastructure/compose/deploy.sh
    ```
 
 2. **Create scaling script**
    ```bash
-   cat > infrastructure/swarm/scale.sh << 'EOF'
+   cat > infrastructure/compose/scale.sh << 'EOF'
    #!/bin/bash
    set -euo pipefail
 
@@ -881,27 +939,30 @@ Deploy services with proper scaling and resource management.
    if [[ -z "$SERVICE" || -z "$REPLICAS" ]]; then
      echo "Usage: $0 <service-name> <replica-count>"
      echo "Available services:"
-     docker service ls --format "table {{.Name}}\t{{.Replicas}}"
+     docker-compose config --services
+     echo ""
+     echo "Current scaling:"
+     docker-compose ps
      exit 1
    fi
 
    echo "🔄 Scaling $SERVICE to $REPLICAS replicas..."
 
    # Scale the service
-   docker service scale microservices_${SERVICE}=${REPLICAS}
+   docker-compose up -d --scale ${SERVICE}=${REPLICAS}
 
    # Wait and show status
    sleep 10
    echo "📊 Current status:"
-   docker service ps microservices_${SERVICE}
+   docker-compose ps $SERVICE
 
    echo "✅ Scaling completed!"
    EOF
    
-   chmod +x infrastructure/swarm/scale.sh
+   chmod +x infrastructure/compose/scale.sh
    ```
 
-## Part 3: Service Mesh and Communication (60 minutes)
+## Part 3: Service Communication and Integration (60 minutes)
 
 ### Task 3.1: Implement Service-to-Service Communication
 Create robust inter-service communication with circuit breakers and retries.
@@ -1982,20 +2043,20 @@ Build Grafana dashboards for monitoring the entire microservices platform.
 
 ## Exercise Summary
 
-**Congratulations!** You have successfully implemented a comprehensive microservices architecture with Docker orchestration including:
+**Congratulations!** You have successfully implemented a comprehensive microservices architecture with Docker Compose including:
 
 ✅ **Microservices Architecture Design**
 - Complete service boundaries and communication contracts
 - Shared base infrastructure and utilities
 - Event-driven architecture patterns
 
-✅ **Docker Swarm Orchestration**
+✅ **Advanced Docker Compose Configuration**
 - Multi-network service deployment
-- Secrets and configuration management
-- Auto-scaling and resource management
-- High availability database configuration
+- Environment-based configuration management
+- Service scaling and resource management
+- High availability database configuration with health checks
 
-✅ **Service Mesh Communication**
+✅ **Service Communication and Integration**
 - Circuit breaker patterns with retry logic
 - Event-driven inter-service communication
 - Distributed tracing with OpenTelemetry and Jaeger
@@ -2008,10 +2069,10 @@ Build Grafana dashboards for monitoring the entire microservices platform.
 - Automated health checking and alerting
 
 ### Key Achievements
-- **Scalability**: Horizontal scaling with Docker Swarm
+- **Scalability**: Horizontal scaling with Docker Compose
 - **Resilience**: Circuit breakers, retries, and graceful degradation
 - **Observability**: Full-stack monitoring with metrics, logs, and traces
-- **Security**: Secrets management and network isolation
+- **Security**: Environment-based secrets management and network isolation
 - **Performance**: Load balancing and resource optimization
 
 ### Architecture Benefits
@@ -2022,4 +2083,4 @@ Build Grafana dashboards for monitoring the entire microservices platform.
 - **Monitoring**: Complete observability across the platform
 
 **Total Time Investment: 240 minutes (4 hours)**
-**Skills Developed: Microservices architecture, Docker Swarm, Service mesh, Distributed tracing, Production monitoring**
+**Skills Developed: Microservices architecture, Advanced Docker Compose, Service communication, Distributed tracing, Production monitoring**
