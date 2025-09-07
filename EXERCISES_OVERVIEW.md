@@ -29,33 +29,41 @@ Each exercise builds upon previous work, creating a complete DevOps pipeline:
 
 ## Module 2: Git, GitHub, and GitHub Actions (Days 3-5)
 
-### Completed Exercises:
+### Comprehensive Exercise Set:
 1. **Git Workflow Setup** (45 min) - Repository initialization and standards
 2. **Branching Strategy Implementation** (60 min) - GitFlow with feature development
 3. **Collaborative Development Simulation** (90 min) - Multi-developer workflows and conflict resolution
 4. **GitHub Repository Configuration** (75 min) - Professional repo setup with protection rules
+5. **Advanced Git Operations** (120 min) - Interactive rebase, cherry-pick, conflict resolution
+6. **Branch Management Strategies** (90 min) - Long-lived branches and merge strategies
+7. **GitHub Actions Fundamentals** (180 min) - Comprehensive CI/CD workflows
+8. **Advanced GitHub Actions Deployment** (240 min) - Production deployment automation
+9. **Enterprise GitHub Actions Integration** (240 min) - Enterprise-grade workflows and security
 
-### Remaining Exercises:
-5. **Basic CI Pipeline with GitHub Actions** (120 min)
-6. **Advanced CI/CD Pipeline** (150 min)
+**Total Module Time: 20.0 hours**
 
-**Key Outcomes:** Professional Git workflow, collaborative development skills, protected repository with templates, basic CI/CD foundation.
+**Key Outcomes:** Professional Git workflow, collaborative development skills, protected repository with templates, comprehensive CI/CD automation, enterprise-grade security and deployment strategies.
 
 ## Module 3: Docker & Docker Compose (Days 6-8)
 
-### Exercise Overview:
+### Comprehensive Exercise Set:
 1. **Application Containerization** (90 min) - Dockerfile creation for 3-tier app
-2. **Multi-Stage Docker Builds** (75 min) - Optimized production containers
-3. **Docker Compose Development Environment** (90 min) - Complete local development stack
-4. **Container Registry and Image Management** (60 min) - ECR/DockerHub integration
-5. **Docker Security and Best Practices** (90 min) - Security scanning and optimization
-6. **Production Docker Setup** (120 min) - Production-ready containerization
+2. **Dockerfile Keywords Mastery** (120 min) - Comprehensive coverage of all Docker directives
+3. **Multi-Stage Builds Advanced** (105 min) - Complex optimization patterns
+4. **Docker Compose Development Environment** (180 min) - Multi-service orchestration
+5. **Docker Networking and Security** (150 min) - Advanced networking and security
+6. **Production Docker Deployment** (210 min) - High availability production setup
+7. **Docker Orchestration and Microservices** (240 min) - Complete microservices platform
+
+**Total Module Time: 19.75 hours**
 
 **Progressive Elements:**
 - Uses application code from Module 1-2
 - Integrates with GitHub Actions from Module 2
 - Builds containers automatically via CI/CD
 - Prepares images for Kubernetes deployment
+- Implements complete microservices architecture
+- Includes comprehensive monitoring and observability
 
 ## Module 4: Kubernetes (Days 9-22) 
 
@@ -156,14 +164,31 @@ Each exercise builds upon previous work, creating a complete DevOps pipeline:
 6. **Documentation and Presentation** (Day 6) - Professional documentation
 7. **Project Review and Optimization** (Day 7) - Final touches and peer review
 
+## Exercise Duration Summary
+
+### High-Intensity Modules (40+ hours each):
+- **Module 2: Git/GitHub Actions**: 20.0 hours (comprehensive version control and CI/CD)
+- **Module 3: Docker/Docker Compose**: 19.75 hours (containerization and microservices)
+
+### Other Modules:
+- **Module 1: DevOps Fundamentals**: 5.75 hours
+- **Module 4: Kubernetes**: 17.5 hours
+- **Module 5: Jenkins**: 11.75 hours
+- **Module 6: GitOps & ArgoCD**: 10.5 hours
+- **Module 7: Terraform & IaC**: 13.25 hours
+- **Module 8: Monitoring**: 12.25 hours
+- **Module 9: Final Project**: 35 hours
+
+**Total Bootcamp: ~145 hours of hands-on exercises**
+
 ## Key Progressive Elements Throughout
 
 ### Application Evolution:
 - **Module 1**: Plan 3-tier architecture
-- **Module 2**: Implement basic application with Git workflow
-- **Module 3**: Containerize all components
+- **Module 2**: Implement application with comprehensive Git workflow and CI/CD
+- **Module 3**: Containerize all components and build microservices platform
 - **Module 4**: Deploy to Kubernetes
-- **Module 5-6**: Automate deployment with CI/CD or GitOps
+- **Module 5-6**: Automate deployment with Jenkins or GitOps
 - **Module 7**: Provision cloud infrastructure
 - **Module 8**: Add comprehensive monitoring
 - **Module 9**: Integrate everything into production-ready system
